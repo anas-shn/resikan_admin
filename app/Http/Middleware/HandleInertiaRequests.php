@@ -2,9 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use Closure;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Symfony\Component\HttpFoundation\Response;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -16,6 +18,20 @@ class HandleInertiaRequests extends Middleware
      * @var string
      */
     protected $rootView = 'app';
+
+    /**
+     * Handle the incoming request.
+     * Skip Inertia for Filament admin panel.
+     */
+    public function handle(Request $request, Closure $next): Response
+    {
+        // Skip Inertia middleware for Filament admin routes
+        if ($request->is('admin') || $request->is('admin/*') || $request->is('livewire/*')) {
+            return $next($request);
+        }
+
+        return parent::handle($request, $next);
+    }
 
     /**
      * Determines the current asset version.
