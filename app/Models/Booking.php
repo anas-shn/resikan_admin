@@ -37,15 +37,15 @@ class Booking extends Model
         return $this->belongsTo(User::class);
     }
 
-    // public function cleaner()
-    // {
-    //     return $this->belongsTo(Cleaner::class);
-    // }
+    public function cleaner()
+    {
+        return $this->belongsTo(Cleaner::class);
+    }
 
-    // public function bookingItems()
-    // {
-    //     return $this->hasMany(BookingItem::class);
-    // }
+    public function bookingItems()
+    {
+        return $this->hasMany(BookingItem::class);
+    }
 
     public function payments()
     {
