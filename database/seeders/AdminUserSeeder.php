@@ -26,8 +26,8 @@ class AdminUserSeeder extends Seeder
                 'email' => 'admin@resikan.com',
                 'phone' => '08123456789',
                 'address' => 'Jakarta, Indonesia',
-                'password_hash' => Hash::make('password'), // Required by Supabase
-                'password' => Hash::make('password'), // For Laravel compatibility
+                'password_hash' => Hash::make('password'), 
+                'password' => Hash::make('password'), 
                 'email_verified_at' => now(),
                 'metadata' => json_encode(['role' => 'admin', 'is_admin' => true]),
                 'created_at' => now(),

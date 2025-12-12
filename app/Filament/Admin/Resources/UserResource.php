@@ -3,7 +3,6 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\UserResource\Pages;
-use App\Filament\Admin\Resources\UserResource\RelationManagers;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -11,43 +10,84 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-users';
+    protected static ?string $navigationLabel = 'Pengguna';
+    protected static ?string $navigationGroup = 'Manajemen';
+    protected static ?int $navigationSort = 1;
+    protected static ?string $modelLabel = 'Pengguna';
+    protected static ?string $pluralModelLabel = 'Pengguna';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('fullname')
-                    ->required()
-                    ->maxLength(200),
-                Forms\Components\TextInput::make('email')
-                    ->email()
-                    ->maxLength(200),
-                Forms\Components\TextInput::make('phone')
-                    ->tel()
-                    ->maxLength(30),
-                Forms\Components\TextInput::make('password_hash')
-                    ->password()
-                    ->required()
-                    ->maxLength(200),
-                Forms\Components\Textarea::make('address')
-                    ->columnSpanFull(),
-                Forms\Components\TextInput::make('metadata'),
-                Forms\Components\TextInput::make('password')
-                    ->password()
-                    ->maxLength(255),
-                Forms\Components\Textarea::make('two_factor_secret')
-                    ->columnSpanFull(),
-                Forms\Components\Textarea::make('two_factor_recovery_codes')
-                    ->columnSpanFull(),
-                Forms\Components\DateTimePicker::make('two_factor_confirmed_at'),
-                Forms\Components\DateTimePicker::make('email_verified_at'),
+                Forms\Components\Section::make('Informasi Pengguna')
+                    ->schema([
+                        Forms\Components\TextInput::make('fullname')
+                            ->label('Nama Lengkap')
+                            ->required()
+                            ->maxLength(200),
+
+                        Forms\Components\TextInput::make('email')
+                            ->label('Email')
+                            ->email()
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(200),
+
+                        Forms\Components\TextInput::make('phone')
+                            ->label('Nomor Telepon')
+                            ->tel()
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(30),
+
+                        Forms\Components\Textarea::make('address')
+                            ->label('Alamat')
+                            ->rows(3)
+                            ->columnSpanFull(),
+
+                        Forms\Components\KeyValue::make('metadata')
+                            ->label('Metadata')
+                            ->keyLabel('Key')
+                            ->valueLabel('Value')
+                            ->columnSpanFull(),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Keamanan')
+                    ->schema([
+                        Forms\Components\TextInput::make('password')
+                            ->label('Password')
+                            ->password()
+                            ->dehydrated(fn ($state) => filled($state))
+                            ->required(fn (string $context): bool => $context === 'create')
+                            ->maxLength(255),
+                    ])
+                    ->hiddenOn('view'),
+
+                Forms\Components\Section::make('Informasi Sistem')
+                    ->schema([
+                        Forms\Components\DateTimePicker::make('created_at')
+                            ->label('Dibuat Pada')
+                            ->disabled()
+                            ->displayFormat('d/m/Y H:i'),
+
+                        Forms\Components\DateTimePicker::make('updated_at')
+                            ->label('Diperbarui Pada')
+                            ->disabled()
+                            ->displayFormat('d/m/Y H:i'),
+
+                        Forms\Components\DateTimePicker::make('email_verified_at')
+                            ->label('Email Diverifikasi Pada')
+                            ->disabled()
+                            ->displayFormat('d/m/Y H:i'),
+                    ])
+                    ->columns(3)
+                    ->collapsed()
+                    ->hiddenOn('create'),
             ]);
     }
 
@@ -55,39 +95,92 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
-                    ->label('ID'),
                 Tables\Columns\TextColumn::make('fullname')
-                    ->searchable(),
+                    ->label('Nama Lengkap')
+                    ->searchable()
+                    ->sortable()
+                    ->weight('bold'),
+
                 Tables\Columns\TextColumn::make('email')
-                    ->searchable(),
+                    ->label('Email')
+                    ->searchable()
+                    ->sortable()
+                    ->copyable()
+                    ->icon('heroicon-o-envelope'),
+
                 Tables\Columns\TextColumn::make('phone')
-                    ->searchable(),
+                    ->label('Telepon')
+                    ->searchable()
+                    ->copyable()
+                    ->icon('heroicon-o-phone'),
+
+                Tables\Columns\TextColumn::make('bookings_count')
+                    ->label('Total Booking')
+                    ->counts('bookings')
+                    ->sortable()
+                    ->badge()
+                    ->color('success'),
+
                 Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
+                    ->label('Terdaftar')
+                    ->dateTime('d/m/Y')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->label('Diperbarui')
+                    ->dateTime('d/m/Y')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('two_factor_confirmed_at')
-                    ->dateTime()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('email_verified_at')
-                    ->dateTime()
-                    ->sortable(),
             ])
             ->filters([
-                //
+                Tables\Filters\Filter::make('created_at')
+                    ->form([
+                        Forms\Components\DatePicker::make('created_from')
+                            ->label('Dari Tanggal'),
+                        Forms\Components\DatePicker::make('created_until')
+                            ->label('Sampai Tanggal'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['created_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['created_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                            );
+                    }),
+
+                Tables\Filters\SelectFilter::make('has_bookings')
+                    ->label('Status Booking')
+                    ->options([
+                        'with_bookings' => 'Pernah Booking',
+                        'without_bookings' => 'Belum Pernah Booking',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['value'] === 'with_bookings',
+                                fn (Builder $query): Builder => $query->has('bookings')
+                            )
+                            ->when(
+                                $data['value'] === 'without_bookings',
+                                fn (Builder $query): Builder => $query->doesntHave('bookings')
+                            );
+                    }),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->requiresConfirmation(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->requiresConfirmation(),
                 ]),
             ]);
     }
@@ -107,5 +200,10 @@ class UserResource extends Resource
             'view' => Pages\ViewUser::route('/{record}'),
             'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
+    }
+
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['fullname', 'email', 'phone'];
     }
 }

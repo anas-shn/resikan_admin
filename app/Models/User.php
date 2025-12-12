@@ -8,9 +8,10 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasName;
 use Filament\Panel;
 
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, HasName
 {
     use HasFactory, Notifiable, TwoFactorAuthenticatable, HasUuids;
 
@@ -82,9 +83,16 @@ class User extends Authenticatable implements FilamentUser
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        // Allow all users with password to access admin panel
-        // You can add more restrictions here (e.g., check for admin role)
-        return $this->password !== null;
+        // Only allow admin@resikan.com to access admin panel
+        return $this->email === 'admin@resikan.com';
+    }
+
+    /**
+     * Get the name attribute (maps fullname for Filament compatibility).
+     */
+    public function getNameAttribute(): ?string
+    {
+        return $this->fullname;
     }
 
     /**
@@ -92,7 +100,7 @@ class User extends Authenticatable implements FilamentUser
      */
     public function getFilamentName(): string
     {
-        return $this->fullname ?? $this->email;
+        return $this->fullname ?? $this->email ?? 'User';
     }
 
     /**
