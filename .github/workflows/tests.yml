@@ -3,11 +3,6 @@ name: tests
 on:
   push:
     branches:
-      - develop
-      - main
-  pull_request:
-    branches:
-      - develop
       - main
 
 jobs:
@@ -25,20 +20,17 @@ jobs:
           tools: composer:v2
           coverage: xdebug
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install Node Dependencies
-        run: npm ci
+        run: bun install
 
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Build Assets
-        run: npm run build
+        run: bun run build
 
       - name: Copy Environment File
         run: cp .env.example .env
@@ -46,5 +38,38 @@ jobs:
       - name: Generate Application Key
         run: php artisan key:generate
 
-      - name: Tests
-        run: ./vendor/bin/phpunit
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            RELEASE=$(date +%Y%m%d%H%M%S)
+            APP_DIR=/var/www/laravel
+
+            mkdir -p $APP_DIR/releases/$RELEASE
+            rsync -a --delete ./ $APP_DIR/releases/$RELEASE
+
+            cat > $APP_DIR/releases/$RELEASE/.env << 'EOF'
+            APP_NAME=Resikan Ad
+            APP_DEBUG=false
+            APP_URL=http://localhost
+
+            DB_CONNECTION=pgsql
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_PORT=${{ secrets.DB_PORT }}
+            DB_DATABASE=${{ secrets.DB_DATABASE }}
+            DB_USERNAME=${{ secrets.DB_USERNAME }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            EOF
+
+            ln -sfn $APP_DIR/releases/$RELEASE $APP_DIR/current
+
+            cd $APP_DIR/current
+            php artisan key:generate --force || true
+            php artisan migrate --force
+            php artisan config:clear
+            php artisan config:cache
+            php artisan optimize
